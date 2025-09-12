@@ -1,0 +1,9 @@
+ebooklib
+beautifulsoup4
+pyperclip
+click
+rich
+pyyaml
+lxml
+pytest
+pytest-mock

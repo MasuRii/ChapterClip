@@ -1,0 +1,6 @@
+settings:
+  include_chapter_titles: true
+  last_epub_directory: E:/Others/Epub
+  log_level: INFO
+  max_words: 20000
+  preserve_paragraph_breaks: true
