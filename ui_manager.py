@@ -34,6 +34,31 @@ def select_epub_file():
         console.print("[yellow]GUI file picker failed, please enter file path manually:[/yellow]")
         return Prompt.ask("Enter EPUB file path")
 
+def select_json_file():
+    """
+    Opens a file dialog to select a JSON file.
+
+    Returns:
+        str: Path to the selected JSON file, or None if cancelled.
+    """
+    try:
+        root = Tk()
+        root.withdraw()  # Hide the main window
+        initial_dir = get_setting('last_json_directory') or os.getcwd()
+        file_path = filedialog.askopenfilename(
+            title="Select JSON file",
+            filetypes=[("JSON files", "*.json")],
+            initialdir=initial_dir
+        )
+        root.destroy()
+        if file_path:
+            set_setting('last_json_directory', os.path.dirname(file_path))
+        return file_path
+    except Exception:
+        # Fallback to console input if GUI fails
+        console.print("[yellow]GUI file picker failed, please enter file path manually:[/yellow]")
+        return Prompt.ask("Enter JSON file path")
+
 def display_main_menu():
     """
     Displays the main menu.

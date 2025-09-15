@@ -18,6 +18,9 @@ class ClipboardError(ChapterClipError):
 
 class ValidationError(ChapterClipError):
     """Raised when input validation fails."""
+class SearchReplaceError(ChapterClipError):
+    """Raised when search-replace operations fail."""
+    pass
     pass
 
 def handle_error(error, message=None, exit_code=1):

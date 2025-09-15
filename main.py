@@ -4,13 +4,14 @@ from rich.console import Console
 from rich.prompt import Prompt
 from ui_manager import (
     display_main_menu, get_user_choice, display_chapter_confirmation,
-    display_extraction_result, display_settings, configure_settings, select_epub_file
+    display_extraction_result, display_settings, configure_settings, select_epub_file, select_json_file
 )
 from epub_processor import EpubProcessor
 from text_extractor import extract_chapters_text
 from clipboard_handler import copy_to_clipboard
-from utils.validators import validate_epub_file, validate_chapter_number
-from utils.error_handler import handle_error
+from utils.validators import validate_epub_file, validate_chapter_number, validate_yes_no_input
+from utils.error_handler import handle_error, SearchReplaceError
+from search_replace_processor import load_search_replace_terms, apply_search_replace
 from config_manager import get_setting
 
 console = Console()
@@ -86,6 +87,29 @@ def handle_extraction():
             console.print("[yellow]No text extracted. The chapter might be empty or exceed word limits.[/yellow]")
             Prompt.ask("Press Enter to continue")
             return
+
+        # Optional search-replace feature
+        use_search_replace = Prompt.ask("Do you have a JSON file with search-replace terms? (y/n)")
+        try:
+            use_sr = validate_yes_no_input(use_search_replace)
+        except ValueError:
+            console.print("[red]Invalid input. Skipping search-replace.[/red]")
+            use_sr = False
+
+        if use_sr:
+            while True:
+                json_path = select_json_file()
+                try:
+                    terms = load_search_replace_terms(json_path)
+                    text = apply_search_replace(text, terms)
+                    console.print("[green]Search-replace applied successfully.[/green]")
+                    break
+                except (SearchReplaceError, Exception) as e:
+                    console.print(f"[red]Error processing search-replace: {str(e)}[/red]")
+                    retry = Prompt.ask("Would you like to retry with a different file or skip? (retry/skip)")
+                    if retry.lower().strip() not in ['retry', 'r']:
+                        console.print("[yellow]Skipping search-replace.[/yellow]")
+                        break
 
         copy_to_clipboard(text)
         display_extraction_result(included_chapters, total_words, max_words)

@@ -10,7 +10,8 @@ DEFAULT_CONFIG = {
         'include_chapter_titles': True,
         'log_level': 'INFO',
         'preserve_paragraph_breaks': True,
-        'last_epub_directory': ''
+        'last_epub_directory': '',
+        'last_json_directory': ''
     }
 }
 

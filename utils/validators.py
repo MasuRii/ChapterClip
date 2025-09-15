@@ -79,3 +79,51 @@ def validate_yes_no_input(user_input):
         return False
     else:
         raise ValidationError("Please enter 'y' or 'n'")
+
+
+def validate_json_file(file_path):
+    """
+    Validates that the given file path is a valid JSON file.
+
+    Args:
+        file_path (str): Path to the JSON file.
+
+    Raises:
+        ValidationError: If the file does not exist or is not a JSON file.
+    """
+    if not os.path.exists(file_path):
+        raise ValidationError(f"File does not exist: {file_path}")
+    if not file_path.lower().endswith('.json'):
+        raise ValidationError("File must be a JSON file (.json)")
+
+
+def validate_search_replace_term(term):
+    """
+    Validates a search-replace term object.
+
+    Args:
+        term (dict): The term object to validate.
+
+    Returns:
+        dict: The validated term object.
+
+    Raises:
+        ValidationError: If validation fails.
+    """
+    required_keys = ['id', 'original', 'replacement', 'caseSensitive', 'isRegex']
+    for key in required_keys:
+        if key not in term:
+            raise ValidationError(f"Missing required key: {key}")
+
+    if not isinstance(term['id'], str):
+        raise ValidationError("Key 'id' must be a string")
+    if not isinstance(term['original'], str):
+        raise ValidationError("Key 'original' must be a string")
+    if not isinstance(term['replacement'], str):
+        raise ValidationError("Key 'replacement' must be a string")
+    if not isinstance(term['caseSensitive'], bool):
+        raise ValidationError("Key 'caseSensitive' must be a boolean")
+    if not isinstance(term['isRegex'], bool):
+        raise ValidationError("Key 'isRegex' must be a boolean")
+
+    return term
