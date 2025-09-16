@@ -78,16 +78,6 @@ def handle_extraction():
             logging.debug("Chapter confirmation declined.")
             return
 
-        max_words = get_setting('max_words')
-        text, included_chapters, total_words = extract_chapters_text(processor, chapter_num, max_words)
-        logging.info(f"Extracted text from chapters {included_chapters[0]}-{included_chapters[-1]}, total words: {total_words}")
-
-        if not text:
-            logging.warning("No text extracted. The chapter might be empty or exceed word limits.")
-            console.print("[yellow]No text extracted. The chapter might be empty or exceed word limits.[/yellow]")
-            Prompt.ask("Press Enter to continue")
-            return
-
         # Optional search-replace feature
         use_search_replace = Prompt.ask("Do you have a JSON file with search-replace terms? (y/n)")
         try:
@@ -96,23 +86,30 @@ def handle_extraction():
             console.print("[red]Invalid input. Skipping search-replace.[/red]")
             use_sr = False
 
+        terms = None
         if use_sr:
             while True:
                 json_path = select_json_file()
                 try:
                     terms = load_search_replace_terms(json_path)
-                    text = apply_search_replace(text, terms)
-                    # Recalculate word count after search-replace processing
-                    total_words = count_words(text)
-                    logging.info(f"Word count after search-replace: {total_words}")
-                    console.print("[green]Search-replace applied successfully.[/green]")
+                    console.print("[green]Search-replace terms loaded successfully.[/green]")
                     break
                 except (SearchReplaceError, Exception) as e:
-                    console.print(f"[red]Error processing search-replace: {str(e)}[/red]")
+                    console.print(f"[red]Error loading search-replace terms: {str(e)}[/red]")
                     retry = Prompt.ask("Would you like to retry with a different file or skip? (retry/skip)")
                     if retry.lower().strip() not in ['retry', 'r']:
                         console.print("[yellow]Skipping search-replace.[/yellow]")
                         break
+
+        max_words = get_setting('max_words')
+        text, included_chapters, total_words = extract_chapters_text(processor, chapter_num, max_words, terms=terms)
+        logging.info(f"Extracted text from chapters {included_chapters[0]}-{included_chapters[-1]}, total words: {total_words}")
+
+        if not text:
+            logging.warning("No text extracted. The chapter might be empty or exceed word limits.")
+            console.print("[yellow]No text extracted. The chapter might be empty or exceed word limits.[/yellow]")
+            Prompt.ask("Press Enter to continue")
+            return
 
         copy_to_clipboard(text)
         display_extraction_result(included_chapters, total_words, max_words)

@@ -142,7 +142,10 @@ def configure_settings():
     console.print("2. Include chapter titles")
     console.print("3. Preserve paragraph breaks")
     console.print("4. Log level")
-    choice = get_user_choice([1, 2, 3, 4])
+    console.print("5. Remove line breaks")
+    console.print("6. Remove empty lines")
+    console.print("7. Fix title duplication")
+    choice = get_user_choice([1, 2, 3, 4, 5, 6, 7])
 
     if choice == 1:
         current = get_setting('max_words')
@@ -167,6 +170,21 @@ def configure_settings():
         current = get_setting('log_level')
         new_value = Prompt.ask(f"Select log level (current: {current})", choices=['DEBUG', 'INFO', 'WARNING', 'ERROR'], default=current)
         set_setting('log_level', new_value)
+        console.print("[green]Setting updated![/green]")
+    elif choice == 5:
+        current = get_setting('remove_line_breaks')
+        new_value = Confirm.ask(f"Remove line breaks? (current: {current})", default=current)
+        set_setting('remove_line_breaks', new_value)
+        console.print("[green]Setting updated![/green]")
+    elif choice == 6:
+        current = get_setting('remove_empty_lines')
+        new_value = Confirm.ask(f"Remove empty lines? (current: {current})", default=current)
+        set_setting('remove_empty_lines', new_value)
+        console.print("[green]Setting updated![/green]")
+    elif choice == 7:
+        current = get_setting('fix_title_duplication')
+        new_value = Confirm.ask(f"Fix title duplication? (current: {current})", default=current)
+        set_setting('fix_title_duplication', new_value)
         console.print("[green]Setting updated![/green]")
 
     console.print("Press Enter to continue...")

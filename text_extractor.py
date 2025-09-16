@@ -3,6 +3,7 @@ import warnings
 from bs4 import BeautifulSoup, XMLParsedAsHTMLWarning
 import re
 from config_manager import get_setting
+from search_replace_processor import apply_search_replace
 
 def extract_text_from_html(html_content):
     """
@@ -39,8 +40,11 @@ def extract_text_from_html(html_content):
 
     # Handle empty line removal
     if get_setting('remove_empty_lines'):
-        # Remove multiple consecutive empty lines, preserving paragraph structure
-        text = re.sub(r'\n\s*\n\s*\n+', '\n\n', text)
+        # Collapse multiple consecutive empty lines to single empty line between paragraphs
+        if get_setting('preserve_paragraph_breaks'):
+            text = re.sub(r'\n\s*\n\s*\n*', '\n\n', text)
+        else:
+            text = re.sub(r'\n\s*\n\s*\n*', '', text)
         logging.debug("Removed consecutive empty lines from extracted text")
 
     return text.strip()
@@ -57,15 +61,16 @@ def count_words(text):
     """
     return len(text.split())
 
-def extract_chapters_text(epub_processor, start_chapter, max_words):
+def extract_chapters_text(epub_processor, start_chapter, max_words, terms=None):
     """
     Extracts text from consecutive chapters starting from the given chapter,
-    up to the maximum word count.
+    up to the maximum word count. Applies search-replace terms to each chapter if provided.
 
     Args:
         epub_processor (EpubProcessor): Instance of EpubProcessor.
         start_chapter (int): Starting chapter number (1-based).
         max_words (int): Maximum word count.
+        terms (list, optional): List of search-replace term dictionaries.
 
     Returns:
         tuple: (extracted_text, included_chapters, total_words)
@@ -79,6 +84,8 @@ def extract_chapters_text(epub_processor, start_chapter, max_words):
     while total_words < max_words and current_chapter <= epub_processor.get_total_chapters():
         chapter_html = epub_processor.get_chapter_content(current_chapter)
         chapter_text = extract_text_from_html(chapter_html)
+        if terms:
+            chapter_text = apply_search_replace(chapter_text, terms)
         chapter_words = count_words(chapter_text)
         logging.debug(f"Processing chapter {current_chapter}, words in chapter: {chapter_words}")
 
