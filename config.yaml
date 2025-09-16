@@ -1,7 +1,10 @@
 settings:
+  fix_title_duplication: true
   include_chapter_titles: true
-  last_epub_directory: E:/Others/Epub
-  last_json_directory: E:/Others/Epub
+  last_epub_directory: E:/SyncFiles
+  last_json_directory: E:/SyncFiles
   log_level: INFO
   max_words: 25000
   preserve_paragraph_breaks: true
+  remove_empty_lines: true
+  remove_line_breaks: false

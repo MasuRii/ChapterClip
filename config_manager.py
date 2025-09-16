@@ -11,7 +11,10 @@ DEFAULT_CONFIG = {
         'log_level': 'INFO',
         'preserve_paragraph_breaks': True,
         'last_epub_directory': '',
-        'last_json_directory': ''
+        'last_json_directory': '',
+        'remove_line_breaks': False,
+        'remove_empty_lines': False,
+        'fix_title_duplication': True
     }
 }
 
@@ -36,6 +39,8 @@ def load_config():
             for key, value in DEFAULT_CONFIG['settings'].items():
                 if key not in config.get('settings', {}):
                     config['settings'][key] = value
+            # Validate configuration
+            validate_config(config)
             return config
     except Exception as e:
         handle_error(e, "Failed to load configuration")
@@ -52,6 +57,21 @@ def save_config(config):
             yaml.dump(config, f, default_flow_style=False)
     except Exception as e:
         handle_error(e, "Failed to save configuration")
+
+def validate_config(config):
+    """
+    Validates the configuration settings.
+    Corrects invalid values to defaults.
+
+    Args:
+        config (dict): Configuration dictionary to validate.
+    """
+    boolean_keys = ['remove_line_breaks', 'remove_empty_lines', 'fix_title_duplication']
+    for key in boolean_keys:
+        if key in config.get('settings', {}):
+            if not isinstance(config['settings'][key], bool):
+                print(f"Warning: Invalid value for '{key}' in config. Expected boolean, using default: {DEFAULT_CONFIG['settings'][key]}")
+                config['settings'][key] = DEFAULT_CONFIG['settings'][key]
 
 def get_setting(key):
     """

@@ -29,9 +29,19 @@ def extract_text_from_html(html_content):
     text = re.sub(r'[ \t]+', ' ', text)  # Normalize spaces
 
     # Handle paragraph preservation based on config
-    if not get_setting('preserve_paragraph_breaks'):
+    if get_setting('remove_line_breaks'):
         text = text.replace('\n', ' ')
         text = re.sub(r' +', ' ', text)
+        logging.debug("Removed line breaks from extracted text")
+    elif not get_setting('preserve_paragraph_breaks'):
+        text = text.replace('\n', ' ')
+        text = re.sub(r' +', ' ', text)
+
+    # Handle empty line removal
+    if get_setting('remove_empty_lines'):
+        # Remove multiple consecutive empty lines, preserving paragraph structure
+        text = re.sub(r'\n\s*\n\s*\n+', '\n\n', text)
+        logging.debug("Removed consecutive empty lines from extracted text")
 
     return text.strip()
 
@@ -79,7 +89,14 @@ def extract_chapters_text(epub_processor, start_chapter, max_words):
 
         if get_setting('include_chapter_titles'):
             chapter_title = epub_processor.get_chapter_title(current_chapter)
-            text += f"\n\n{chapter_title}\n\n"
+            # Check for title duplication if enabled
+            if get_setting('fix_title_duplication'):
+                if chapter_title.strip() and chapter_title.lower().strip() in chapter_text.lower():
+                    logging.debug(f"Skipped adding duplicate title '{chapter_title}' for chapter {current_chapter}")
+                else:
+                    text += f"\n\n{chapter_title}\n\n"
+            else:
+                text += f"\n\n{chapter_title}\n\n"
 
         text += chapter_text + "\n\n"
         total_words += chapter_words

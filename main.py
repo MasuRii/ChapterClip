@@ -7,7 +7,7 @@ from ui_manager import (
     display_extraction_result, display_settings, configure_settings, select_epub_file, select_json_file
 )
 from epub_processor import EpubProcessor
-from text_extractor import extract_chapters_text
+from text_extractor import extract_chapters_text, count_words
 from clipboard_handler import copy_to_clipboard
 from utils.validators import validate_epub_file, validate_chapter_number, validate_yes_no_input
 from utils.error_handler import handle_error, SearchReplaceError
@@ -102,6 +102,9 @@ def handle_extraction():
                 try:
                     terms = load_search_replace_terms(json_path)
                     text = apply_search_replace(text, terms)
+                    # Recalculate word count after search-replace processing
+                    total_words = count_words(text)
+                    logging.info(f"Word count after search-replace: {total_words}")
                     console.print("[green]Search-replace applied successfully.[/green]")
                     break
                 except (SearchReplaceError, Exception) as e:
