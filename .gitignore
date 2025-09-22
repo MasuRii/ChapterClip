@@ -417,6 +417,4 @@ FodyWeavers.xsd
 *.msm
 *.msp
 
-tests/*.py
 .pytest_cache
-tests
