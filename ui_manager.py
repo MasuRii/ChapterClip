@@ -88,18 +88,18 @@ def get_user_choice(options):
     choice = Prompt.ask("Enter your choice", choices=[str(o) for o in options])
     return int(choice)
 
-def display_chapter_confirmation(chapter_num, title):
+def display_chapter_confirmation(real_num, title):
     """
     Displays chapter confirmation prompt.
 
     Args:
-        chapter_num (int): Chapter number.
+        real_num (int): Real chapter number.
         title (str): Chapter title.
 
     Returns:
         bool: True if confirmed.
     """
-    console.print(f"\n[bold]Chapter {chapter_num}: {title}[/bold]")
+    console.print(f"\n[bold]Chapter {real_num}: {title}[/bold]")
     confirmed = Confirm.ask("Is this the correct chapter?")
     return confirmed
 

@@ -62,19 +62,28 @@ def handle_extraction():
             Prompt.ask("Press Enter to continue")
             return
 
-        chapter_input = Prompt.ask(f"Enter the chapter number (1-{max_chapters})")
+        range_str = processor.get_real_chapter_range()
+        if range_str:
+            chapter_input = Prompt.ask(f"Enter the starting chapter number ({range_str})")
+        else:
+            chapter_input = Prompt.ask(f"Enter the starting chapter number (1-{max_chapters})")
         try:
-            chapter_num = int(chapter_input)
+            real_chapter_num = int(chapter_input)
         except ValueError:
             console.print("[red]Invalid chapter number.[/red]")
             Prompt.ask("Press Enter to continue")
             return
 
-        validate_chapter_number(chapter_num, max_chapters)
+        if real_chapter_num in processor.real_to_index:
+            chapter_num = processor.real_to_index[real_chapter_num] + 1  # 1-based
+        else:
+            console.print("[red]Chapter number not found in the EPUB.[/red]")
+            Prompt.ask("Press Enter to continue")
+            return
         title = processor.get_chapter_title(chapter_num)
         logging.debug(f"Selected chapter {chapter_num}: {title}")
 
-        if not display_chapter_confirmation(chapter_num, title):
+        if not display_chapter_confirmation(real_chapter_num, title):
             logging.debug("Chapter confirmation declined.")
             return
 

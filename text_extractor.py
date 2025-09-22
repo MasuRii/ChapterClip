@@ -107,7 +107,8 @@ def extract_chapters_text(epub_processor, start_chapter, max_words, terms=None):
 
         text += chapter_text + "\n\n"
         total_words += chapter_words
-        included_chapters.append(current_chapter)
+        real_num = epub_processor.get_real_chapter_number(current_chapter - 1)
+        included_chapters.append(real_num if real_num is not None else current_chapter)
         logging.info(f"Included chapter {current_chapter} with {chapter_words} words")
         current_chapter += 1
 
