@@ -31,10 +31,15 @@ class EpubProcessor:
             self.chapters = self.get_chapters()
             # Populate real chapter numbers
             for idx, item in enumerate(self.chapters):
-                num = self.extract_chapter_number(item)
+                num, method, source = self.extract_chapter_number(item)
                 self.real_chapter_numbers.append(num)
+                logging.debug(f"Chapter index {idx}: source='{source}', extracted={num}, method={method}")
                 if num is not None:
                     self.real_to_index[num] = idx
+                    logging.debug(f"Chapter index {idx}: real number {num}, filename {item.get_name()}")
+                else:
+                    logging.info(f"Chapter index {idx}: no real number extracted, filename {item.get_name()}")
+            logging.debug(f"Real to index mapping: {self.real_to_index}")
             logging.info(f"Loaded EPUB file: {self.file_path}")
         except Exception as e:
             raise InvalidEpubError(f"Failed to load EPUB: {str(e)}")
@@ -43,21 +48,37 @@ class EpubProcessor:
         """
         Extracts the real chapter number from the item's title, content, or filename.
 
-        Prioritizes title, then <title> tag in content, then filename, then content text.
+        Prioritizes filename, then title, then <title> tag in content, then content text.
 
         Returns:
-            int or None: The real chapter number, or None if not found.
+            tuple: (int or None, str, str) - The real chapter number, method used, source text.
         """
         filename = item.get_name()
         logging.debug(f"Extracting chapter number for item: {filename}")
 
-        # Check title first: match '^(\d+):'
+        # Check filename first: match '_(\d+)_'
+        filename_match = re.search(r'_(\d+)_', filename)
+        logging.debug(f"Filename regex match: {filename_match}")
+        if filename_match:
+            extracted = int(filename_match.group(1))
+            logging.debug(f"Extracted from filename: {extracted}")
+            return extracted, 'filename', filename
+        else:
+            logging.debug("Filename does not match '_(\\d+)_', falling back to title")
+
+        # Else, check title: match '^(\d+):'
         logging.debug(f"item.title exists: {item.title is not None}, value: {item.title}")
         if item.title:
             title_match = re.match(r'^(\d+):', item.title.strip())
-            logging.debug(f"Title match: {title_match}, extracted: {int(title_match.group(1)) if title_match else None}")
+            logging.debug(f"Title regex match: {title_match}")
             if title_match:
-                return int(title_match.group(1))
+                extracted = int(title_match.group(1))
+                logging.debug(f"Extracted from title: {extracted}")
+                return extracted, 'title', item.title.strip()
+            else:
+                logging.debug("Title exists but does not match regex '^(\\d+):', falling back")
+        else:
+            logging.debug("No item.title, falling back to <title> tag")
 
         # Else, parse content for <title> tag
         content = item.get_content().decode('utf-8', errors='ignore')
@@ -66,23 +87,29 @@ class EpubProcessor:
         if title_tag_match:
             title_text = title_tag_match.group(1).strip()
             num_match = re.match(r'^(\d+):', title_text)
-            logging.debug(f"Number from <title> text: {num_match}, extracted: {int(num_match.group(1)) if num_match else None}")
+            logging.debug(f"<title> text regex match: {num_match}")
             if num_match:
-                return int(num_match.group(1))
+                extracted = int(num_match.group(1))
+                logging.debug(f"Extracted from <title> tag: {extracted}")
+                return extracted, 'title_tag', title_text
+            else:
+                logging.debug("<title> tag found but text does not match regex, falling back")
+        else:
+            logging.debug("No <title> tag found, falling back to content")
 
-        # Else, from filename: numeric prefix
-        filename_match = re.search(r'_(\d+)_', filename)
-        logging.debug(f"Filename match: {filename_match}, extracted: {int(filename_match.group(1)) if filename_match else None}")
-        if filename_match:
-            return int(filename_match.group(1))
-
-        # Else, parse content text for "Chapter (\d+):"
-        content_match = re.search(r'Chapter (\d+):', content, re.IGNORECASE)
-        logging.debug(f"Content match for 'Chapter (\\d+):': {content_match}, extracted: {int(content_match.group(1)) if content_match else None}")
+        # Else, parse content text for "Chapter (\d+)" in first 200 chars
+        content_start = content[:200]
+        content_match = re.match(r'^Chapter (\d+)', content_start, re.IGNORECASE)
+        logging.debug(f"Content regex match: {content_match}")
         if content_match:
-            return int(content_match.group(1))
+            extracted = int(content_match.group(1))
+            logging.debug(f"Extracted from content: {extracted}")
+            return extracted, 'content', content_start
+        else:
+            logging.debug("No '^Chapter (\\d+)' found in first 200 chars of content")
 
-        return None
+        logging.info(f"No chapter number extracted for {filename}")
+        return None, 'none', ''
 
     def get_chapters(self):
         """

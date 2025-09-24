@@ -88,7 +88,7 @@ def extract_chapters_text(epub_processor, start_chapter, max_words, terms=None):
     Returns:
         tuple: (extracted_text, included_chapters, total_words)
     """
-    logging.info(f"Starting text extraction from chapter {start_chapter} with max words {max_words}")
+    logging.info(f"Starting text extraction from chapter {epub_processor.get_real_chapter_number(start_chapter - 1)} with max words {max_words}")
     text = ""
     current_chapter = start_chapter
     total_words = 0
@@ -128,7 +128,7 @@ def extract_chapters_text(epub_processor, start_chapter, max_words, terms=None):
         total_words += chapter_words
         real_num = epub_processor.get_real_chapter_number(current_chapter - 1)
         included_chapters.append(real_num if real_num is not None else current_chapter)
-        logging.info(f"Included chapter {current_chapter} with {chapter_words} words")
+        logging.info(f"Included chapter {real_num} with {chapter_words} words")
         current_chapter += 1
 
     logging.info(f"Extraction complete: included {len(included_chapters)} chapters, total words: {total_words}")
