@@ -41,7 +41,7 @@ def load_search_replace_terms(file_path):
 
 def apply_search_replace(text, terms):
     """
-    Applies search-replace terms to the given text sequentially.
+    Applies search-replace terms to the given text using batched replacement to handle overlaps and prioritization.
 
     Args:
         text (str): The original text to process.
@@ -54,22 +54,77 @@ def apply_search_replace(text, terms):
         SearchReplaceError: If an error occurs during replacement.
     """
     try:
+        # Separate terms into regex and non-regex groups
+        regex_terms = []
+        simple_cs = {}
+        simple_ci = {}
         for term in terms:
-            original = term['original']
-            replacement = term['replacement']
-            case_sensitive = term['caseSensitive']
-            is_regex = term['isRegex']
-
-            flags = 0 if case_sensitive else re.IGNORECASE
-
-            if is_regex:
-                pattern = original
+            orig = term['original']
+            repl = term['replacement']
+            cs = term['caseSensitive']
+            is_rx = term['isRegex']
+            if is_rx:
+                flags = 0 if cs else re.IGNORECASE
+                pattern = re.compile(orig, flags)
+                regex_terms.append({'pattern': pattern, 'replacement': repl})
             else:
-                pattern = re.escape(original)
+                if cs:
+                    simple_cs[orig] = repl
+                else:
+                    simple_ci[orig.lower()] = repl
 
-            text = re.sub(pattern, replacement, text, flags=flags)
+        # Compile combined patterns for non-regex terms
+        compiled_terms = regex_terms.copy()
+        if simple_cs:
+            sorted_keys_cs = sorted(simple_cs.keys(), key=len, reverse=True)
+            combined_cs = '|'.join(re.escape(k) for k in sorted_keys_cs)
+            pattern_cs = re.compile(combined_cs)
+            compiled_terms.append({'pattern': pattern_cs, 'replacement_map': simple_cs, 'is_simple': True, 'case_sensitive': True})
+        if simple_ci:
+            sorted_keys_ci = sorted(simple_ci.keys(), key=len, reverse=True)
+            combined_ci = '|'.join(re.escape(k) for k in sorted_keys_ci)
+            pattern_ci = re.compile(combined_ci, re.IGNORECASE)
+            compiled_terms.append({'pattern': pattern_ci, 'replacement_map': simple_ci, 'is_simple': True, 'case_sensitive': False})
 
-        return text
+        # Find all matches
+        replacements = []
+        for comp in compiled_terms:
+            pat = comp['pattern']
+            for match in pat.finditer(text):
+                if match.start() == match.end():
+                    continue  # Skip zero-length matches
+                matched_text = match.group(0)
+                if comp.get('is_simple'):
+                    key = matched_text if comp['case_sensitive'] else matched_text.lower()
+                    repl = comp['replacement_map'].get(key)
+                    if repl is not None:
+                        replacements.append({'start': match.start(), 'end': match.end(), 'replacement': repl})
+                else:
+                    replacements.append({'start': match.start(), 'end': match.end(), 'replacement': comp['replacement']})
+
+        # Sort matches by start position ascending, then by match length descending
+        replacements.sort(key=lambda r: (r['start'], -(r['end'] - r['start'])))
+
+        # Select non-overlapping replacements
+        winning = []
+        last_end = -1
+        for rep in replacements:
+            if rep['start'] >= last_end:
+                winning.append(rep)
+                last_end = rep['end']
+
+        # Sort winning replacements by start position descending for reverse order application
+        winning.sort(key=lambda r: r['start'], reverse=True)
+
+        # Apply replacements in reverse order
+        result = text
+        for rep in winning:
+            start = rep['start']
+            end = rep['end']
+            repl = rep['replacement']
+            result = result[:start] + repl + result[end:]
+
+        return result
 
     except Exception as e:
         raise SearchReplaceError(f"Error applying search-replace: {str(e)}")
