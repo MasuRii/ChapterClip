@@ -114,12 +114,23 @@ def display_extraction_result(included_chapters, total_words, max_words):
     """
     console.print("\n[bold green]Extraction Complete![/bold green]")
     console.print("✓ Successfully extracted and copied to clipboard\n")
-    console.print("Details:")
+    console.print("\nDetails:")
     console.print(f"  • Chapters included: {included_chapters[0]}-{included_chapters[-1]} ({len(included_chapters)} chapters)")
     console.print(f"  • Total words: {total_words}")
     console.print(f"  • Maximum allowed: {max_words}")
-    console.print("\nPress Enter to return to main menu...")
-    input()
+
+def display_post_extraction_menu():
+    """
+    Displays the post-extraction menu and gets user choice.
+
+    Returns:
+        int: User's choice (1 or 2).
+    """
+    console.print("\nWhat would you like to do next?\n")
+    console.print("[1] Recopy the extracted text to clipboard again")
+    console.print("[2] Return to the main menu")
+    choice = get_user_choice([1, 2])
+    return choice
 
 def display_settings():
     """

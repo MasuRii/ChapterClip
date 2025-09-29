@@ -109,6 +109,8 @@ def extract_chapters_text(epub_processor, start_chapter, max_words, terms=None):
 
         if get_setting('include_chapter_titles'):
             chapter_title = epub_processor.get_chapter_title(current_chapter)
+            if terms:
+                chapter_title = apply_search_replace(chapter_title, terms)
             # Check for title duplication if enabled
             if get_setting('fix_title_duplication'):
                 normalized_title = normalize_title_for_dedup(chapter_title)

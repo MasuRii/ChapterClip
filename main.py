@@ -4,7 +4,7 @@ from rich.console import Console
 from rich.prompt import Prompt
 from ui_manager import (
     display_main_menu, get_user_choice, display_chapter_confirmation,
-    display_extraction_result, display_settings, configure_settings, select_epub_file, select_json_file
+    display_extraction_result, display_settings, configure_settings, select_epub_file, select_json_file, display_post_extraction_menu
 )
 from epub_processor import EpubProcessor
 from text_extractor import extract_chapters_text, count_words
@@ -122,6 +122,14 @@ def handle_extraction():
 
         copy_to_clipboard(text)
         display_extraction_result(included_chapters, total_words, max_words)
+
+        while True:
+            choice = display_post_extraction_menu()
+            if choice == 1:
+                copy_to_clipboard(text)
+                console.print("[green]Text recopied to clipboard![/green]")
+            else:
+                break
 
     except Exception as e:
         logging.error(f"Error during extraction: {str(e)}")
