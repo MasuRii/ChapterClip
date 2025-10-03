@@ -1,15 +1,18 @@
+import os
 import json
 import re
 from utils.validators import validate_json_file, validate_search_replace_term
 from utils.error_handler import SearchReplaceError
 
 
-def load_search_replace_terms(file_path):
+def load_search_replace_terms(file_path, epub_path=None):
     """
     Loads and validates search-replace terms from a JSON file.
 
+    Supports both old format (direct array of term objects) and new nested object format.
+
     Args:
-        file_path (str): Path to the JSON file containing an array of term objects.
+        file_path (str): Path to the JSON file.
 
     Returns:
         list: List of validated term dictionaries.
@@ -21,10 +24,28 @@ def load_search_replace_terms(file_path):
         validate_json_file(file_path)
 
         with open(file_path, 'r', encoding='utf-8') as f:
-            terms = json.load(f)
+            data = json.load(f)
 
-        if not isinstance(terms, list):
-            raise SearchReplaceError("JSON file must contain an array of term objects.")
+        if isinstance(data, list):
+            # Old format
+            terms = data
+        elif isinstance(data, dict):
+            # New format
+            if not all(key in data for key in ['formatVersion', 'settings', 'terms']):
+                raise SearchReplaceError("New format JSON must contain 'formatVersion', 'settings', and 'terms'.")
+            if epub_path:
+                game_name = os.path.basename(epub_path).replace('.epub', '').lower().replace('_', '-')
+            else:
+                game_name = os.path.basename(file_path).replace('-terms.json', '')
+            if game_name not in data['terms']:
+                raise SearchReplaceError(f"No terms found for game '{game_name}'.")
+            if data['settings'].get(game_name, {}).get('isDisabled', False):
+                raise SearchReplaceError(f"Game '{game_name}' is disabled.")
+            terms = data['terms'][game_name]
+            if not isinstance(terms, list):
+                raise SearchReplaceError(f"Terms for game '{game_name}' must be an array.")
+        else:
+            raise SearchReplaceError("JSON must be an array (old format) or object (new format).")
 
         validated_terms = []
         for term in terms:

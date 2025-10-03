@@ -110,12 +110,12 @@ def validate_search_replace_term(term):
     Raises:
         ValidationError: If validation fails.
     """
-    required_keys = ['id', 'original', 'replacement', 'caseSensitive', 'isRegex']
+    required_keys = ['original', 'replacement', 'caseSensitive', 'isRegex']
     for key in required_keys:
         if key not in term:
             raise ValidationError(f"Missing required key: {key}")
 
-    if not isinstance(term['id'], str):
+    if 'id' in term and not isinstance(term['id'], str):
         raise ValidationError("Key 'id' must be a string")
     if not isinstance(term['original'], str):
         raise ValidationError("Key 'original' must be a string")
@@ -125,5 +125,7 @@ def validate_search_replace_term(term):
         raise ValidationError("Key 'caseSensitive' must be a boolean")
     if not isinstance(term['isRegex'], bool):
         raise ValidationError("Key 'isRegex' must be a boolean")
+    if 'wholeWord' in term and not isinstance(term['wholeWord'], bool):
+        raise ValidationError("Key 'wholeWord' must be a boolean")
 
     return term

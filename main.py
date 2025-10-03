@@ -100,7 +100,7 @@ def handle_extraction():
             while True:
                 json_path = select_json_file()
                 try:
-                    terms = load_search_replace_terms(json_path)
+                    terms = load_search_replace_terms(json_path, epub_path=processor.file_path)
                     console.print("[green]Search-replace terms loaded successfully.[/green]")
                     break
                 except (SearchReplaceError, Exception) as e:
