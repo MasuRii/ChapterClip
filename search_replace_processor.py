@@ -66,7 +66,7 @@ def apply_search_replace(text, terms):
 
     Args:
         text (str): The original text to process.
-        terms (list): List of term dictionaries with 'original', 'replacement', 'caseSensitive', 'isRegex'.
+        terms (list): List of term dictionaries with 'original', 'replacement', 'caseSensitive', 'isRegex', 'wholeWord'.
 
     Returns:
         str: The processed text with replacements applied.
@@ -75,37 +75,60 @@ def apply_search_replace(text, terms):
         SearchReplaceError: If an error occurs during replacement.
     """
     try:
-        # Separate terms into regex and non-regex groups
+        # Categorize terms
+        simple_cs_partial = {}
+        simple_cs_whole = {}
+        simple_ci_partial = {}
+        simple_ci_whole = {}
         regex_terms = []
-        simple_cs = {}
-        simple_ci = {}
         for term in terms:
             orig = term['original']
             repl = term['replacement']
             cs = term['caseSensitive']
             is_rx = term['isRegex']
+            whole = term.get('wholeWord', False)
             if is_rx:
                 flags = 0 if cs else re.IGNORECASE
-                pattern = re.compile(orig, flags)
-                regex_terms.append({'pattern': pattern, 'replacement': repl})
+                regex_terms.append({'pattern': re.compile(orig, flags), 'replacement': repl})
             else:
+                key = orig if cs else orig.lower()
                 if cs:
-                    simple_cs[orig] = repl
+                    if whole:
+                        simple_cs_whole[key] = repl
+                    else:
+                        simple_cs_partial[key] = repl
                 else:
-                    simple_ci[orig.lower()] = repl
+                    if whole:
+                        simple_ci_whole[key] = repl
+                    else:
+                        simple_ci_partial[key] = repl
 
-        # Compile combined patterns for non-regex terms
+        # Compile combined patterns
         compiled_terms = regex_terms.copy()
-        if simple_cs:
-            sorted_keys_cs = sorted(simple_cs.keys(), key=len, reverse=True)
-            combined_cs = '|'.join(re.escape(k) for k in sorted_keys_cs)
-            pattern_cs = re.compile(combined_cs)
-            compiled_terms.append({'pattern': pattern_cs, 'replacement_map': simple_cs, 'is_simple': True, 'case_sensitive': True})
-        if simple_ci:
-            sorted_keys_ci = sorted(simple_ci.keys(), key=len, reverse=True)
-            combined_ci = '|'.join(re.escape(k) for k in sorted_keys_ci)
-            pattern_ci = re.compile(combined_ci, re.IGNORECASE)
-            compiled_terms.append({'pattern': pattern_ci, 'replacement_map': simple_ci, 'is_simple': True, 'case_sensitive': False})
+        def add_simple_group(map_dict, flags, whole_word, case_sensitive):
+            if map_dict:
+                sorted_keys = sorted(map_dict.keys(), key=len, reverse=True)
+                patterns = []
+                for k in sorted_keys:
+                    escaped = re.escape(k)
+                    if whole_word:
+                        pattern = r'\b' + escaped + r'\b'
+                    else:
+                        pattern = escaped
+                    patterns.append(pattern)
+                combined = '|'.join(patterns)
+                pattern = re.compile(combined, flags)
+                compiled_terms.append({
+                    'pattern': pattern,
+                    'replacement_map': map_dict,
+                    'is_simple': True,
+                    'case_sensitive': case_sensitive
+                })
+
+        add_simple_group(simple_cs_partial, 0, False, True)
+        add_simple_group(simple_cs_whole, 0, True, True)
+        add_simple_group(simple_ci_partial, re.IGNORECASE, False, False)
+        add_simple_group(simple_ci_whole, re.IGNORECASE, True, False)
 
         # Find all matches
         replacements = []
@@ -113,7 +136,7 @@ def apply_search_replace(text, terms):
             pat = comp['pattern']
             for match in pat.finditer(text):
                 if match.start() == match.end():
-                    continue  # Skip zero-length matches
+                    continue
                 matched_text = match.group(0)
                 if comp.get('is_simple'):
                     key = matched_text if comp['case_sensitive'] else matched_text.lower()
@@ -123,10 +146,10 @@ def apply_search_replace(text, terms):
                 else:
                     replacements.append({'start': match.start(), 'end': match.end(), 'replacement': comp['replacement']})
 
-        # Sort matches by start position ascending, then by match length descending
-        replacements.sort(key=lambda r: (r['start'], -(r['end'] - r['start'])))
+        # Sort: start asc, then end desc
+        replacements.sort(key=lambda r: (r['start'], -r['end']))
 
-        # Select non-overlapping replacements
+        # Select non-overlapping
         winning = []
         last_end = -1
         for rep in replacements:
@@ -134,10 +157,10 @@ def apply_search_replace(text, terms):
                 winning.append(rep)
                 last_end = rep['end']
 
-        # Sort winning replacements by start position descending for reverse order application
+        # Sort by start desc
         winning.sort(key=lambda r: r['start'], reverse=True)
 
-        # Apply replacements in reverse order
+        # Apply
         result = text
         for rep in winning:
             start = rep['start']
