@@ -124,12 +124,13 @@ def display_post_extraction_menu():
     Displays the post-extraction menu and gets user choice.
 
     Returns:
-        int: User's choice (1 or 2).
+        int: User's choice (1, 2, or 3).
     """
     console.print("\nWhat would you like to do next?\n")
     console.print("[1] Recopy the extracted text to clipboard again")
-    console.print("[2] Return to the main menu")
-    choice = get_user_choice([1, 2])
+    console.print("[2] Redo extraction with previous settings")
+    console.print("[3] Return to the main menu")
+    choice = get_user_choice([1, 2, 3])
     return choice
 
 def display_settings():

@@ -14,7 +14,8 @@ DEFAULT_CONFIG = {
         'last_json_directory': '',
         'remove_line_breaks': False,
         'remove_empty_lines': False,
-        'fix_title_duplication': True
+        'fix_title_duplication': True,
+        'last_extraction_params': None
     }
 }
 
@@ -85,6 +86,26 @@ def get_setting(key):
     """
     config = load_config()
     return config['settings'].get(key)
+def get_last_extraction_params():
+    """
+    Retrieves the last extraction parameters.
+
+    Returns:
+        dict or None: Last extraction parameters, or None if not set.
+    """
+    config = load_config()
+    return config['settings'].get('last_extraction_params')
+
+def save_last_extraction_params(params):
+    """
+    Saves the last extraction parameters.
+
+    Args:
+        params (dict or None): Extraction parameters to save, or None to clear.
+    """
+    config = load_config()
+    config['settings']['last_extraction_params'] = params
+    save_config(config)
 
 def set_setting(key, value):
     """

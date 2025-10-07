@@ -1,3 +1,4 @@
+import os
 import click
 import logging
 from rich.console import Console
@@ -12,7 +13,7 @@ from clipboard_handler import copy_to_clipboard
 from utils.validators import validate_epub_file, validate_chapter_number, validate_yes_no_input
 from utils.error_handler import handle_error, SearchReplaceError
 from search_replace_processor import load_search_replace_terms, apply_search_replace
-from config_manager import get_setting
+from config_manager import get_setting, save_last_extraction_params, get_last_extraction_params
 
 console = Console()
 
@@ -80,8 +81,10 @@ def handle_extraction():
             console.print("[red]Chapter number not found in the EPUB.[/red]")
             Prompt.ask("Press Enter to continue")
             return
+
         title = processor.get_chapter_title(chapter_num)
         logging.debug(f"Selected chapter {chapter_num}: {title}")
+        json_path = None
 
         if not display_chapter_confirmation(real_chapter_num, title):
             logging.debug("Chapter confirmation declined.")
@@ -122,17 +125,89 @@ def handle_extraction():
 
         copy_to_clipboard(text)
         display_extraction_result(included_chapters, total_words, max_words)
+        save_last_extraction_params({
+            'file_path': file_path,
+            'real_chapter_num': real_chapter_num,
+            'max_words': max_words,
+            'json_path': json_path
+        })
 
         while True:
             choice = display_post_extraction_menu()
             if choice == 1:
                 copy_to_clipboard(text)
                 console.print("[green]Text recopied to clipboard![/green]")
-            else:
+            elif choice == 2:
+                handle_redo_extraction()
+                break
+            elif choice == 3:
                 break
 
     except Exception as e:
         logging.error(f"Error during extraction: {str(e)}")
+        console.print(f"[red]Error: {str(e)}[/red]")
+        Prompt.ask("Press Enter to continue")
+
+def handle_redo_extraction():
+    """Handles redoing the last extraction with previous settings."""
+    params = get_last_extraction_params()
+    if not params:
+        console.print("[yellow]No previous extraction found to redo.[/yellow]")
+        Prompt.ask("Press Enter to continue")
+        return
+
+    file_path = params.get('file_path')
+    if not file_path or not os.path.exists(file_path):
+        console.print("[red]The previous EPUB file is no longer available.[/red]")
+        Prompt.ask("Press Enter to continue")
+        return
+
+    try:
+        validate_epub_file(file_path)
+        processor = EpubProcessor(file_path)
+        real_chapter_num = params.get('real_chapter_num')
+        if real_chapter_num not in processor.real_to_index:
+            console.print("[red]The previous chapter is no longer available in the EPUB.[/red]")
+            Prompt.ask("Press Enter to continue")
+            return
+
+        chapter_num = processor.real_to_index[real_chapter_num] + 1
+        title = processor.get_chapter_title(chapter_num)
+        console.print(f"[bold blue]Redoing extraction from Chapter {real_chapter_num}: {title}[/bold blue]")
+
+        terms = None
+        json_path = params.get('json_path')
+        if json_path and os.path.exists(json_path):
+            try:
+                terms = load_search_replace_terms(json_path, epub_path=file_path)
+                console.print("[green]Search-replace terms loaded from previous settings.[/green]")
+            except Exception as e:
+                console.print(f"[yellow]Failed to load search-replace terms: {str(e)}, proceeding without.[/yellow]")
+
+        max_words = params.get('max_words', get_setting('max_words'))
+        text, included_chapters, total_words = extract_chapters_text(processor, chapter_num, max_words, terms=terms)
+
+        if not text:
+            console.print("[yellow]No text extracted. The chapter might be empty or exceed word limits.[/yellow]")
+            Prompt.ask("Press Enter to continue")
+            return
+
+        copy_to_clipboard(text)
+        display_extraction_result(included_chapters, total_words, max_words)
+
+        while True:
+            choice = display_post_extraction_menu()
+            if choice == 1:
+                copy_to_clipboard(text)
+                console.print("[green]Text recopied to clipboard![/green]")
+            elif choice == 2:
+                handle_redo_extraction()
+                break
+            elif choice == 3:
+                break
+
+    except Exception as e:
+        logging.error(f"Error during redo extraction: {str(e)}")
         console.print(f"[red]Error: {str(e)}[/red]")
         Prompt.ask("Press Enter to continue")
 
