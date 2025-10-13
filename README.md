@@ -20,13 +20,33 @@ To provide readers with an efficient way to extract and copy manageable portions
 - **EPUB File Selection**: GUI file picker dialog for EPUB selection with validation
 - **Improved Chapter Detection**: Automatically excludes non-chapter content based on filename patterns and content length
 - **Chapter Selection**: Numeric input for chapter number with title confirmation
-- **Word Count Configuration**: Default 20,000 words, user-configurable, persistent settings
+- **Counting Mode**: Choose between word counting or LLM token-based counting, with user-configurable limits
 - **Text Extraction**: Extracts complete chapters only, removes HTML tags, preserves formatting
 - **Warning Suppression**: Suppresses XML parsing warnings for cleaner output
 - **Logging Configuration**: Configurable logging levels via config.yaml
 - **Output Management**: Direct copy to system clipboard with extraction summary
 - **User Interface**: Interactive CLI menu system with progress indicators
 - **Cross-Platform**: Supports Windows, macOS, and Linux
+
+## Counting Mode
+
+ChapterClip supports two counting modes for determining text extraction limits: **words** and **tokens**.
+
+### Word Counting
+The default mode that counts individual words in the extracted text. This mode ensures backward compatibility with existing configurations and behavior.
+
+### Token Counting
+Uses LLM tokenization (via Google Generative AI) to count tokens instead of words. This is particularly useful for users working with AI models that have token-based limits rather than word limits.
+
+### Configuration
+Users can configure the counting mode through:
+- **UI Config Menu**: Select option 2 (Configure settings) and choose the desired counting mode
+- **config.yaml**: Set the `counting_mode` field to either `'words'` or `'tokens'`
+
+### Dependencies and Fallback
+Token counting requires the `google-generativeai` library. If this dependency is unavailable, the tool automatically falls back to word counting to ensure uninterrupted functionality.
+
+**Backward Compatibility**: Existing installations default to word counting, preserving existing behavior unchanged.
 
 ## Architecture
 
@@ -62,6 +82,9 @@ Install the required packages using pip:
 ```bash
 pip install ebooklib>=0.18 beautifulsoup4>=4.11.0 pyperclip>=1.8.2 click>=8.1.0 rich>=13.0.0 pyyaml>=6.0 lxml>=4.9.0
 ```
+
+**Optional Dependencies**:
+- `google-generativeai`: Required for token-based counting (automatic fallback to word counting if unavailable)
 
 ### Setup
 1. Clone the repository:
@@ -121,13 +144,15 @@ Configuration is stored in `config.yaml`:
 ```yaml
 settings:
   max_words: 20000
+  counting_mode: words
   include_chapter_titles: true
   preserve_paragraph_breaks: true
   last_epub_directory: ""
   log_level: INFO
 ```
 
-- `max_words`: Maximum word count for extraction (default: 20,000)
+- `max_words`: Maximum count for extraction (words or tokens, depending on counting_mode; default: 20,000)
+- `counting_mode`: Counting method ('words' or 'tokens'; default: 'words')
 - `include_chapter_titles`: Whether to include chapter titles in output
 - `preserve_paragraph_breaks`: Maintain paragraph structure in extracted text
 - `last_epub_directory`: Remembers the last directory used for file selection

@@ -103,21 +103,23 @@ def display_chapter_confirmation(real_num, title):
     confirmed = Confirm.ask("Is this the correct chapter?")
     return confirmed
 
-def display_extraction_result(included_chapters, total_words, max_words):
+def display_extraction_result(included_chapters, total_count, max_count):
     """
     Displays the extraction result summary.
 
     Args:
         included_chapters (list): List of included chapter numbers.
-        total_words (int): Total words extracted.
-        max_words (int): Maximum allowed words.
+        total_count (int): Total count extracted (words or tokens).
+        max_count (int): Maximum allowed count.
     """
+    from config_manager import get_setting
+    count_type = "tokens" if get_setting('counting_mode') == 'tokens' else "words"
     console.print("\n[bold green]Extraction Complete![/bold green]")
     console.print("✓ Successfully extracted and copied to clipboard\n")
     console.print("\nDetails:")
     console.print(f"  • Chapters included: {included_chapters[0]}-{included_chapters[-1]} ({len(included_chapters)} chapters)")
-    console.print(f"  • Total words: {total_words}")
-    console.print(f"  • Maximum allowed: {max_words}")
+    console.print(f"  • Total {count_type}: {total_count}")
+    console.print(f"  • Maximum allowed: {max_count}")
 
 def display_post_extraction_menu():
     """
@@ -149,22 +151,27 @@ def configure_settings():
     """
     Allows user to configure settings.
     """
+    counting_mode = get_setting('counting_mode')
+    label = "Max tokens" if counting_mode == 'tokens' else "Max words"
     console.print("\n[bold]Configure Settings[/bold]")
-    console.print("1. Max words")
+    console.print(f"1. {label}")
     console.print("2. Include chapter titles")
     console.print("3. Preserve paragraph breaks")
     console.print("4. Log level")
     console.print("5. Remove line breaks")
     console.print("6. Remove empty lines")
     console.print("7. Fix title duplication")
-    choice = get_user_choice([1, 2, 3, 4, 5, 6, 7])
+    console.print("8. Counting mode")
+    choice = get_user_choice([1, 2, 3, 4, 5, 6, 7, 8])
 
     if choice == 1:
-        current = get_setting('max_words')
-        new_value = Prompt.ask(f"Enter new max words (current: {current})", default=str(current))
+        key = 'max_tokens' if counting_mode == 'tokens' else 'max_words'
+        current = get_setting(key)
+        count_type = 'tokens' if counting_mode == 'tokens' else 'words'
+        new_value = Prompt.ask(f"Enter new max {count_type} (current: {current})", default=str(current))
         try:
             new_value = int(new_value)
-            set_setting('max_words', new_value)
+            set_setting(key, new_value)
             console.print("[green]Setting updated![/green]")
         except ValueError:
             console.print("[red]Invalid value![/red]")
@@ -198,6 +205,11 @@ def configure_settings():
         new_value = Confirm.ask(f"Fix title duplication? (current: {current})", default=current)
         set_setting('fix_title_duplication', new_value)
         console.print("[green]Setting updated![/green]")
-
+    elif choice == 8:
+        current = get_setting('counting_mode')
+        new_value = Prompt.ask(f"Select counting mode (current: {current})", choices=['words', 'tokens'], default=current)
+        set_setting('counting_mode', new_value)
+        console.print("[green]Setting updated![/green]")
+    
     console.print("Press Enter to continue...")
     input()

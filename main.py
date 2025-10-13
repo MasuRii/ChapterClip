@@ -25,6 +25,21 @@ def cli():
 @cli.command()
 def run():
     """Run the interactive ChapterClip application."""
+    # Load environment variables from .env file
+    from dotenv import load_dotenv
+    import google.generativeai as genai
+
+    load_dotenv()
+
+    # Configure Google Generative AI if API key is available
+    api_key = os.getenv('GOOGLE_API_KEY')
+    if api_key:
+        genai.configure(api_key=api_key)
+        logging.getLogger().setLevel(logging.INFO)
+        logging.info("Google Generative AI configured with API key from .env")
+    else:
+        logging.warning("GOOGLE_API_KEY not found in .env file, token counting will fall back to word counting")
+
     log_level_name = get_setting('log_level')
     logging.basicConfig(level=logging.getLevelName(log_level_name), format='%(levelname)s: %(message)s')
     logging.info("ChapterClip application started.")
@@ -113,22 +128,24 @@ def handle_extraction():
                         console.print("[yellow]Skipping search-replace.[/yellow]")
                         break
 
-        max_words = get_setting('max_words')
-        text, included_chapters, total_words = extract_chapters_text(processor, chapter_num, max_words, terms=terms)
-        logging.info(f"Extracted text from chapters {included_chapters[0]}-{included_chapters[-1]}, total words: {total_words}")
+        counting_mode = get_setting('counting_mode')
+        max_count = get_setting('max_tokens') if counting_mode == 'tokens' else get_setting('max_words')
+        text, included_chapters, total_count = extract_chapters_text(processor, chapter_num, max_count, terms=terms)
+        logging.info(f"Extracted text from chapters {included_chapters[0]}-{included_chapters[-1]}, total count: {total_count}")
 
         if not text:
-            logging.warning("No text extracted. The chapter might be empty or exceed word limits.")
-            console.print("[yellow]No text extracted. The chapter might be empty or exceed word limits.[/yellow]")
+            logging.warning("No text extracted. The chapter might be empty or exceed limits.")
+            console.print("[yellow]No text extracted. The chapter might be empty or exceed limits.[/yellow]")
             Prompt.ask("Press Enter to continue")
             return
 
         copy_to_clipboard(text)
-        display_extraction_result(included_chapters, total_words, max_words)
+        display_extraction_result(included_chapters, total_count, max_count)
         save_last_extraction_params({
             'file_path': file_path,
             'real_chapter_num': real_chapter_num,
-            'max_words': max_words,
+            'counting_mode': counting_mode,
+            'max_limit': max_count,
             'json_path': json_path
         })
 
@@ -184,16 +201,17 @@ def handle_redo_extraction():
             except Exception as e:
                 console.print(f"[yellow]Failed to load search-replace terms: {str(e)}, proceeding without.[/yellow]")
 
-        max_words = params.get('max_words', get_setting('max_words'))
-        text, included_chapters, total_words = extract_chapters_text(processor, chapter_num, max_words, terms=terms)
+        counting_mode = params.get('counting_mode', get_setting('counting_mode'))
+        max_count = params.get('max_limit', get_setting('max_tokens') if counting_mode == 'tokens' else get_setting('max_words'))
+        text, included_chapters, total_count = extract_chapters_text(processor, chapter_num, max_count, terms=terms)
 
         if not text:
-            console.print("[yellow]No text extracted. The chapter might be empty or exceed word limits.[/yellow]")
+            console.print("[yellow]No text extracted. The chapter might be empty or exceed limits.[/yellow]")
             Prompt.ask("Press Enter to continue")
             return
 
         copy_to_clipboard(text)
-        display_extraction_result(included_chapters, total_words, max_words)
+        display_extraction_result(included_chapters, total_count, max_count)
 
         while True:
             choice = display_post_extraction_menu()

@@ -7,3 +7,5 @@ pyyaml
 lxml
 pytest
 pytest-mock
+python-dotenv
+google-generativeai  # Optional, for token counting

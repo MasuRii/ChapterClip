@@ -7,6 +7,7 @@ CONFIG_FILE = 'config.yaml'
 DEFAULT_CONFIG = {
     'settings': {
         'max_words': 20000,
+        'max_tokens': 20000,
         'include_chapter_titles': True,
         'log_level': 'INFO',
         'preserve_paragraph_breaks': True,
@@ -15,6 +16,7 @@ DEFAULT_CONFIG = {
         'remove_line_breaks': False,
         'remove_empty_lines': False,
         'fix_title_duplication': True,
+        'counting_mode': 'words',
         'last_extraction_params': None
     }
 }
@@ -73,6 +75,12 @@ def validate_config(config):
             if not isinstance(config['settings'][key], bool):
                 print(f"Warning: Invalid value for '{key}' in config. Expected boolean, using default: {DEFAULT_CONFIG['settings'][key]}")
                 config['settings'][key] = DEFAULT_CONFIG['settings'][key]
+
+    # Validate counting_mode
+    if 'counting_mode' in config.get('settings', {}):
+        if config['settings']['counting_mode'] not in ['words', 'tokens']:
+            print(f"Warning: Invalid value for 'counting_mode' in config. Expected 'words' or 'tokens', using default: {DEFAULT_CONFIG['settings']['counting_mode']}")
+            config['settings']['counting_mode'] = DEFAULT_CONFIG['settings']['counting_mode']
 
 def get_setting(key):
     """

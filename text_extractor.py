@@ -48,15 +48,30 @@ def extract_text_from_html(html_content):
 
 def count_words(text):
     """
-    Counts the number of words in the text.
+    Counts the number of words or tokens in the text based on counting_mode setting.
 
     Args:
-        text (str): Text to count words in.
+        text (str): Text to count in.
 
     Returns:
-        int: Word count.
+        int: Count of words or tokens.
     """
-    return len(text.split())
+    mode = get_setting('counting_mode')
+    if mode == 'tokens':
+        try:
+            import google.generativeai as genai
+            model = genai.GenerativeModel('gemini-2.5-flash')
+            result = model.count_tokens(text)
+            return result.total_tokens
+        except ImportError:
+            logging.warning("google-generativeai not installed, falling back to word counting")
+            return len(text.split())
+        except Exception as e:
+            logging.warning(f"Token counting failed: {e}, falling back to word counting")
+            return len(text.split())
+    else:
+        # Default to word counting
+        return len(text.split())
 
 def normalize_title_for_dedup(text):
     """
@@ -74,37 +89,38 @@ def normalize_title_for_dedup(text):
     text = re.sub(r'^\d+\s*', '', text)
     return text.strip()
 
-def extract_chapters_text(epub_processor, start_chapter, max_words, terms=None):
+def extract_chapters_text(epub_processor, start_chapter, max_count, terms=None):
     """
     Extracts text from consecutive chapters starting from the given chapter,
-    up to the maximum word count. Applies search-replace terms to each chapter if provided.
+    up to the maximum count. Applies search-replace terms to each chapter if provided.
 
     Args:
         epub_processor (EpubProcessor): Instance of EpubProcessor.
         start_chapter (int): Starting chapter number (1-based).
-        max_words (int): Maximum word count.
+        max_count (int): Maximum count (words or tokens based on mode).
         terms (list, optional): List of search-replace term dictionaries.
 
     Returns:
-        tuple: (extracted_text, included_chapters, total_words)
+        tuple: (extracted_text, included_chapters, total_count)
     """
-    logging.info(f"Starting text extraction from chapter {epub_processor.get_real_chapter_number(start_chapter - 1)} with max words {max_words}")
+    count_type = "tokens" if get_setting('counting_mode') == 'tokens' else "words"
+    logging.info(f"Starting text extraction from chapter {epub_processor.get_real_chapter_number(start_chapter - 1)} with max {count_type} {max_count}")
     text = ""
     current_chapter = start_chapter
-    total_words = 0
+    total_count = 0
     included_chapters = []
 
-    while total_words < max_words and current_chapter <= epub_processor.get_total_chapters():
+    while total_count < max_count and current_chapter <= epub_processor.get_total_chapters():
         chapter_html = epub_processor.get_chapter_content(current_chapter)
         chapter_text = extract_text_from_html(chapter_html)
         if terms:
             chapter_text = apply_search_replace(chapter_text, terms)
-        chapter_words = count_words(chapter_text)
-        logging.debug(f"Processing chapter {current_chapter}, words in chapter: {chapter_words}")
+        chapter_count = count_words(chapter_text)
+        logging.debug(f"Processing chapter {current_chapter}, {count_type} in chapter: {chapter_count}")
 
-        if total_words + chapter_words > max_words:
+        if total_count + chapter_count > max_count:
             # Don't include partial chapters
-            logging.debug(f"Chapter {current_chapter} would exceed max words, stopping extraction")
+            logging.debug(f"Chapter {current_chapter} would exceed max {count_type}, stopping extraction")
             break
 
         if get_setting('include_chapter_titles'):
@@ -127,11 +143,11 @@ def extract_chapters_text(epub_processor, start_chapter, max_words, terms=None):
                 text += f"\n\n{chapter_title}\n\n"
 
         text += chapter_text + "\n\n"
-        total_words += chapter_words
+        total_count += chapter_count
         real_num = epub_processor.get_real_chapter_number(current_chapter - 1)
         included_chapters.append(real_num if real_num is not None else current_chapter)
-        logging.info(f"Included chapter {real_num} with {chapter_words} words")
+        logging.info(f"Included chapter {real_num} with {chapter_count} {count_type}")
         current_chapter += 1
 
-    logging.info(f"Extraction complete: included {len(included_chapters)} chapters, total words: {total_words}")
-    return text.strip(), included_chapters, total_words
+    logging.info(f"Extraction complete: included {len(included_chapters)} chapters, total {count_type}: {total_count}")
+    return text.strip(), included_chapters, total_count
