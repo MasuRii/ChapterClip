@@ -3,6 +3,48 @@ import json
 import re
 from utils.validators import validate_json_file, validate_search_replace_term
 from utils.error_handler import SearchReplaceError
+def fix_variable_lookbehind(pattern):
+    """
+    Fixes variable-width lookbehind patterns by refactoring them into fixed-width alternatives.
+
+    Specifically handles patterns like "(?<=\\d|\\b)(cr)\\b" and converts them to
+    "(?<=\\d)(cr)\\b|\\b(cr)\\b".
+
+    Args:
+        pattern (str): The regex pattern to fix.
+
+    Returns:
+        str: The fixed pattern, or the original if no fix is needed.
+    """
+    # Match lookbehind: (?<=content)
+    lookbehind_match = re.search(r'\(\?<=([^)]*)\)', pattern)
+    if not lookbehind_match:
+        return pattern
+
+    lb_content = lookbehind_match.group(1)
+    if '|' not in lb_content:
+        return pattern
+
+    # Split alternatives
+    alts = [alt.strip() for alt in lb_content.split('|')]
+
+    # Get the part after the lookbehind
+    lb_end = lookbehind_match.end()
+    match_part = pattern[lb_end:]
+
+    # Build new patterns
+    new_patterns = []
+    for alt in alts:
+        if alt == '\\b':
+            # For \b (zero-width), place it before the match
+            new_pattern = f'\\b{match_part}'
+        else:
+            # For other alternatives, keep the lookbehind
+            new_pattern = f'(?<={alt}){match_part}'
+        new_patterns.append(new_pattern)
+
+    return '|'.join(new_patterns)
+
 
 
 def load_search_replace_terms(file_path, epub_path=None):
@@ -88,8 +130,10 @@ def apply_search_replace(text, terms):
             is_rx = term['isRegex']
             whole = term.get('wholeWord', False)
             if is_rx:
+                # Fix variable-width lookbehind patterns
+                fixed_orig = fix_variable_lookbehind(orig)
                 flags = 0 if cs else re.IGNORECASE
-                regex_terms.append({'pattern': re.compile(orig, flags), 'replacement': repl})
+                regex_terms.append({'pattern': re.compile(fixed_orig, flags), 'replacement': repl})
             else:
                 key = orig if cs else orig.lower()
                 if cs:
