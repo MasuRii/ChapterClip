@@ -68,9 +68,10 @@ def display_main_menu():
         "[bold blue]ChapterClip - EPUB Text Extractor[/bold blue]\n\n"
         "Please select an option:\n\n"
         "[1] Extract chapters from EPUB\n"
-        "[2] Configure settings\n"
-        "[3] View current settings\n"
-        "[4] Exit\n",
+        "[2] Replace Epub Terms\n"
+        "[3] Configure settings\n"
+        "[4] View current settings\n"
+        "[5] Exit\n",
         title="Main Menu"
     )
     console.print(panel)
@@ -134,18 +135,85 @@ def display_post_extraction_menu():
     console.print("[3] Return to the main menu")
     choice = get_user_choice([1, 2, 3])
     return choice
+def display_replacement_result(processed_items, output_path):
+    """
+    Displays the replacement result summary.
+
+    Args:
+        processed_items (int): Number of items processed.
+        output_path (str): Path to the output EPUB file.
+    """
+    console.print("\n[bold green]Term Replacement Complete![/bold green]")
+    console.print("✓ Successfully processed EPUB with term replacements\n")
+    console.print("\nDetails:")
+    console.print(f"  • HTML items processed: {processed_items}")
+    console.print(f"  • Output file: {output_path}")
+
+def display_replacement_confirmation(terms_count, epub_path):
+    """
+    Displays confirmation for term replacement operation.
+
+    Args:
+        terms_count (int): Number of terms loaded.
+        epub_path (str): Path to the EPUB file.
+
+    Returns:
+        bool: True if confirmed.
+    """
+    from rich.prompt import Confirm
+    console.print(f"\n[bold]Ready to process EPUB:[/bold] {epub_path}")
+    console.print(f"[bold]Terms loaded:[/bold] {terms_count}")
+    confirmed = Confirm.ask("Proceed with term replacement?")
+    return confirmed
 
 def display_settings():
     """
-    Displays current settings in a table.
+    Displays current settings in tables for general and performance settings.
     """
     settings = load_config()['settings']
-    table = Table(title="Current Settings")
-    table.add_column("Setting", style="cyan")
-    table.add_column("Value", style="magenta")
+
+    # Performance settings keys
+    performance_keys = ['enable_parallel_processing', 'max_workers', 'enable_content_filtering', 'min_word_count_threshold', 'exclusion_keywords']
+
+    # General settings table
+    general_table = Table(title="General Settings")
+    general_table.add_column("Setting", style="cyan")
+    general_table.add_column("Value", style="magenta")
+
+    # Performance settings table
+    performance_table = Table(title="Performance Settings")
+    performance_table.add_column("Setting", style="cyan")
+    performance_table.add_column("Value", style="magenta")
+
     for key, value in settings.items():
-        table.add_row(key.replace('_', ' ').title(), str(value))
-    console.print(table)
+        if key in performance_keys:
+            # Format performance settings with clear labels
+            if key == 'enable_parallel_processing':
+                display_value = "Enabled" if value else "Disabled"
+                label = "Parallel Processing"
+            elif key == 'max_workers':
+                display_value = str(value)
+                label = "Max Workers"
+            elif key == 'enable_content_filtering':
+                display_value = "Enabled" if value else "Disabled"
+                label = "Content Filtering"
+            elif key == 'min_word_count_threshold':
+                display_value = str(value)
+                label = "Min Word Count Threshold"
+            elif key == 'exclusion_keywords':
+                display_value = ', '.join(value) if isinstance(value, list) else str(value)
+                label = "Exclusion Keywords"
+            else:
+                label = key.replace('_', ' ').title()
+                display_value = str(value)
+            performance_table.add_row(label, display_value)
+        elif key not in ['last_extraction_params', 'last_epub_directory', 'last_json_directory']:
+            # Exclude internal/directory settings from general table
+            general_table.add_row(key.replace('_', ' ').title(), str(value))
+
+    console.print(general_table)
+    console.print()  # Add space between tables
+    console.print(performance_table)
 
 def configure_settings():
     """
@@ -162,7 +230,12 @@ def configure_settings():
     console.print("6. Remove empty lines")
     console.print("7. Fix title duplication")
     console.print("8. Counting mode")
-    choice = get_user_choice([1, 2, 3, 4, 5, 6, 7, 8])
+    console.print("9. Enable parallel processing")
+    console.print("10. Max workers")
+    console.print("11. Enable content filtering")
+    console.print("12. Min word count threshold")
+    console.print("13. Manage exclusion keywords")
+    choice = get_user_choice([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13])
 
     if choice == 1:
         key = 'max_tokens' if counting_mode == 'tokens' else 'max_words'
@@ -210,6 +283,69 @@ def configure_settings():
         new_value = Prompt.ask(f"Select counting mode (current: {current})", choices=['words', 'tokens'], default=current)
         set_setting('counting_mode', new_value)
         console.print("[green]Setting updated![/green]")
-    
+    elif choice == 9:
+        current = get_setting('enable_parallel_processing')
+        new_value = Confirm.ask(f"Enable parallel processing? (current: {current})", default=current)
+        set_setting('enable_parallel_processing', new_value)
+        console.print("[green]Setting updated![/green]")
+    elif choice == 10:
+        current = get_setting('max_workers')
+        new_value = Prompt.ask(f"Enter max workers (current: {current})", default=str(current))
+        try:
+            new_value = int(new_value)
+            if new_value > 0:
+                set_setting('max_workers', new_value)
+                console.print("[green]Setting updated![/green]")
+            else:
+                console.print("[red]Max workers must be greater than 0![/red]")
+        except ValueError:
+            console.print("[red]Invalid value! Must be a number.[/red]")
+    elif choice == 11:
+        current = get_setting('enable_content_filtering')
+        new_value = Confirm.ask(f"Enable content filtering? (current: {current})", default=current)
+        set_setting('enable_content_filtering', new_value)
+        console.print("[green]Setting updated![/green]")
+    elif choice == 12:
+        current = get_setting('min_word_count_threshold')
+        new_value = Prompt.ask(f"Enter min word count threshold (current: {current})", default=str(current))
+        try:
+            new_value = int(new_value)
+            if new_value >= 0:
+                set_setting('min_word_count_threshold', new_value)
+                console.print("[green]Setting updated![/green]")
+            else:
+                console.print("[red]Min word count threshold must be 0 or greater![/red]")
+        except ValueError:
+            console.print("[red]Invalid value! Must be a number.[/red]")
+    elif choice == 13:
+        current_keywords = get_setting('exclusion_keywords')
+        console.print(f"Current exclusion keywords: {', '.join(current_keywords)}")
+        action = Prompt.ask("Choose action", choices=['add', 'remove', 'replace'], default='add')
+        if action == 'add':
+            new_keyword = Prompt.ask("Enter keyword to add")
+            if new_keyword and new_keyword not in current_keywords:
+                current_keywords.append(new_keyword)
+                set_setting('exclusion_keywords', current_keywords)
+                console.print("[green]Keyword added![/green]")
+            else:
+                console.print("[yellow]Keyword already exists or is empty.[/yellow]")
+        elif action == 'remove':
+            if current_keywords:
+                remove_keyword = Prompt.ask("Enter keyword to remove", choices=current_keywords)
+                current_keywords.remove(remove_keyword)
+                set_setting('exclusion_keywords', current_keywords)
+                console.print("[green]Keyword removed![/green]")
+            else:
+                console.print("[yellow]No keywords to remove.[/yellow]")
+        elif action == 'replace':
+            console.print("Enter new keywords separated by commas:")
+            new_keywords_input = Prompt.ask("New keywords")
+            new_keywords = [kw.strip() for kw in new_keywords_input.split(',') if kw.strip()]
+            if new_keywords:
+                set_setting('exclusion_keywords', new_keywords)
+                console.print("[green]Keywords replaced![/green]")
+            else:
+                console.print("[yellow]No valid keywords entered.[/yellow]")
+
     console.print("Press Enter to continue...")
     input()

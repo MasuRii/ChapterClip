@@ -1,7 +1,10 @@
 import logging
 import re
+import os
+import concurrent.futures
 from ebooklib import epub
 from utils.error_handler import InvalidEpubError, ChapterNotFoundError
+from config_manager import get_setting
 
 class EpubProcessor:
     """
@@ -214,6 +217,123 @@ class EpubProcessor:
         Returns the total number of chapters.
         """
         return len(self.chapters)
+
+    def save_epub_with_suffix(self, output_path):
+        """
+        Saves the current EPUB book to the specified path.
+
+        Args:
+            output_path (str): Path where to save the EPUB.
+
+        Raises:
+            InvalidEpubError: If saving fails.
+        """
+        try:
+            epub.write_epub(output_path, self.book, {})
+            logging.info(f"EPUB saved to: {output_path}")
+        except Exception as e:
+            raise InvalidEpubError(f"Failed to save EPUB: {str(e)}")
+
+    def apply_search_replace_to_epub(self, terms):
+        """
+        Applies search-replace terms to HTML content items in the EPUB, excluding non-content files.
+        Uses configurable parallel processing and content filtering for improved performance.
+
+        Args:
+            terms (list): List of validated term dictionaries.
+
+        Returns:
+            int: Number of items processed.
+        """
+        from search_replace_processor import apply_search_replace
+
+        # Retrieve performance settings from config
+        enable_parallel_processing = get_setting('enable_parallel_processing')
+        enable_content_filtering = get_setting('enable_content_filtering')
+        min_word_count_threshold = get_setting('min_word_count_threshold')
+        exclusion_keywords = get_setting('exclusion_keywords') or ['cover', 'info', 'toc', 'contents', 'copyright', 'acknowledgment']
+
+        # Collect processable items
+        processable_items = []
+        items = list(self.book.get_items())
+        logging.debug(f"Total items in EPUB: {len(items)}")
+
+        for item in items:
+            if item.media_type in ['application/xhtml+xml', 'text/html']:
+                filename = item.get_name()
+                # Check for exclusion keywords in filename
+                if any(kw in filename.lower() for kw in exclusion_keywords):
+                    logging.debug(f"Skipped non-content file: {filename}, reason: contains exclusion keyword")
+                    continue
+                if enable_content_filtering:
+                    # Content filtering: check word count
+                    content = item.get_content().decode('utf-8', errors='ignore')
+                    content_no_tags = re.sub(r'<[^>]+>', '', content)
+                    words = content_no_tags.split()
+                    word_count = len(words)
+                    if word_count < min_word_count_threshold:
+                        logging.debug(f"Skipped file: {filename}, reason: content too short ({word_count} words)")
+                        continue
+                else:
+                    content = item.get_content().decode('utf-8', errors='ignore')
+                processable_items.append((item, filename, content))
+
+        logging.info(f"Found {len(processable_items)} processable HTML items for term replacement")
+
+        if not processable_items:
+            return 0
+
+        # Define helper function for processing individual items
+        def process_item(item_data):
+            item, filename, content = item_data
+            try:
+                logging.info(f"Processing item: {filename}")
+                replaced_content = apply_search_replace(content, terms)
+                if replaced_content != content:
+                    # Ensure thread-safe content update
+                    item.set_content(replaced_content.encode('utf-8'))
+                    logging.debug(f"Applied replacements to item: {filename}")
+                    return True  # Indicates content was modified
+                return False
+            except Exception as e:
+                logging.error(f"Error processing item {filename}: {str(e)}")
+                return False
+
+        # Use ThreadPoolExecutor for parallel processing if enabled
+        processed_count = 0
+
+        if enable_parallel_processing:
+            max_workers = get_setting('max_workers') or min(os.cpu_count() or 4, len(processable_items))
+            with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+                # Submit all tasks
+                future_to_item = {executor.submit(process_item, item_data): item_data[1] for item_data in processable_items}
+
+                # Process completed tasks
+                for future in concurrent.futures.as_completed(future_to_item):
+                    filename = future_to_item[future]
+                    try:
+                        was_modified = future.result()
+                        processed_count += 1
+                        if processed_count % 10 == 0 or processed_count == len(processable_items):
+                            logging.info(f"Progress: {processed_count}/{len(processable_items)} items processed")
+                    except Exception as e:
+                        logging.error(f"Error processing item {filename}: {str(e)}")
+                        processed_count += 1  # Still count as processed even if failed
+        else:
+            # Sequential processing
+            for item_data in processable_items:
+                filename = item_data[1]
+                try:
+                    was_modified = process_item(item_data)
+                    processed_count += 1
+                    if processed_count % 10 == 0 or processed_count == len(processable_items):
+                        logging.info(f"Progress: {processed_count}/{len(processable_items)} items processed")
+                except Exception as e:
+                    logging.error(f"Error processing item {filename}: {str(e)}")
+                    processed_count += 1  # Still count as processed even if failed
+
+        logging.info(f"Completed processing: {processed_count} HTML items processed for term replacement")
+        return processed_count
     def get_real_chapter_number(self, index):
         """
         Returns the real chapter number for the given sequential index (0-based).

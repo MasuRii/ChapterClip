@@ -5,7 +5,7 @@ from rich.console import Console
 from rich.prompt import Prompt
 from ui_manager import (
     display_main_menu, get_user_choice, display_chapter_confirmation,
-    display_extraction_result, display_settings, configure_settings, select_epub_file, select_json_file, display_post_extraction_menu
+    display_extraction_result, display_settings, configure_settings, select_epub_file, select_json_file, display_post_extraction_menu, display_replacement_result, display_replacement_confirmation
 )
 from epub_processor import EpubProcessor
 from text_extractor import extract_chapters_text, count_words
@@ -19,7 +19,7 @@ console = Console()
 
 @click.group()
 def cli():
-    """ChapterClip - EPUB Text Extractor"""
+    """ChapterClip - EPUB Processor"""
     pass
 
 @cli.command()
@@ -45,16 +45,18 @@ def run():
     logging.info("ChapterClip application started.")
     while True:
         display_main_menu()
-        choice = get_user_choice([1, 2, 3, 4])
+        choice = get_user_choice([1, 2, 3, 4, 5])
         logging.debug(f"Menu choice: {choice}")
         if choice == 1:
             handle_extraction()
         elif choice == 2:
-            configure_settings()
+            handle_epub_terms_replacement()
         elif choice == 3:
+            configure_settings()
+        elif choice == 4:
             display_settings()
             Prompt.ask("Press Enter to continue")
-        elif choice == 4:
+        elif choice == 5:
             logging.info("ChapterClip application exiting.")
             console.print("[bold blue]Goodbye![/bold blue]")
             break
@@ -226,6 +228,51 @@ def handle_redo_extraction():
 
     except Exception as e:
         logging.error(f"Error during redo extraction: {str(e)}")
+        console.print(f"[red]Error: {str(e)}[/red]")
+        Prompt.ask("Press Enter to continue")
+
+
+def handle_epub_terms_replacement():
+    """Handles the EPUB terms replacement workflow."""
+    file_path = select_epub_file()
+    if not file_path:
+        logging.debug("No EPUB file selected.")
+        return
+
+    try:
+        logging.debug(f"Selected EPUB file: {file_path}")
+        validate_epub_file(file_path)
+        processor = EpubProcessor(file_path)
+
+        json_path = select_json_file()
+        if not json_path:
+            logging.debug("No JSON file selected.")
+            return
+
+        logging.debug(f"Selected JSON file: {json_path}")
+        terms = load_search_replace_terms(json_path, epub_path=processor.file_path)
+        console.print(f"[green]Loaded {len(terms)} search-replace terms.[/green]")
+
+        if not display_replacement_confirmation(len(terms), file_path):
+            logging.debug("Replacement confirmation declined.")
+            return
+
+        logging.info(f"Starting term replacement on {len(list(processor.book.get_items()))} items")
+        processed_count = processor.apply_search_replace_to_epub(terms)
+
+        # Generate output filename with suffix
+        base_name = os.path.splitext(os.path.basename(file_path))[0]
+        dir_name = os.path.dirname(file_path)
+        output_filename = f"{base_name}_TermsReplaced.epub"
+        output_path = os.path.join(dir_name, output_filename)
+
+        processor.save_epub_with_suffix(output_path)
+        display_replacement_result(processed_count, output_path)
+
+        Prompt.ask("Press Enter to continue")
+
+    except Exception as e:
+        logging.error(f"Error during EPUB terms replacement: {str(e)}")
         console.print(f"[red]Error: {str(e)}[/red]")
         Prompt.ask("Press Enter to continue")
 

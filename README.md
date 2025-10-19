@@ -1,13 +1,13 @@
-# ChapterClip
+# ChapterClip - EPUB Processor
 
-A Python CLI tool that extracts and copies a user-defined word count from EPUB files starting from a specified chapter. The tool provides a clean, HTML-free text extraction that automatically calculates and includes complete chapters up to a maximum word limit.
+A Python CLI tool that extracts and copies a user-defined word count from EPUB files starting from a specified chapter, and applies search and replace operations. The tool provides a clean, HTML-free text extraction that automatically calculates and includes complete chapters up to a maximum word limit, with optional term replacement functionality.
 
 ## Overview
 
-ChapterClip is designed to provide readers with an efficient way to extract and copy manageable portions of their EPUB books for reading, note-taking, or text processing purposes. It supports standard EPUB formats and ensures clean text output without HTML artifacts.
+ChapterClip is designed to provide readers with an efficient way to extract and copy manageable portions of their EPUB books for reading, note-taking, or text processing purposes, with optional search and replace functionality for text modification. It supports standard EPUB formats and ensures clean text output without HTML artifacts.
 
 ### Vision Statement
-To provide readers with an efficient way to extract and copy manageable portions of their EPUB books for reading, note-taking, or text processing purposes.
+To provide readers with an efficient way to extract and copy manageable portions of their EPUB books for reading, note-taking, or text processing purposes, with optional search and replace functionality for customized text modifications.
 
 ### Target Users
 - Digital readers who want to extract specific portions of books
@@ -22,6 +22,7 @@ To provide readers with an efficient way to extract and copy manageable portions
 - **Chapter Selection**: Numeric input for chapter number with title confirmation
 - **Counting Mode**: Choose between word counting or LLM token-based counting, with user-configurable limits
 - **Text Extraction**: Extracts complete chapters only, removes HTML tags, preserves formatting
+- **Search and Replace**: Optional term replacement functionality using JSON-configured search-replace pairs
 - **Warning Suppression**: Suppresses XML parsing warnings for cleaner output
 - **Logging Configuration**: Configurable logging levels via config.yaml
 - **Output Management**: Direct copy to system clipboard with extraction summary
@@ -113,7 +114,7 @@ python main.py run
 ### Main Menu
 ```
 ═══════════════════════════════════════════
-        ChapterClip - EPUB Text Extractor
+           ChapterClip - EPUB Processor
 ═══════════════════════════════════════════
 
 Please select an option:

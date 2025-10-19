@@ -178,7 +178,8 @@ def apply_search_replace(text, terms):
         replacements = []
         for comp in compiled_terms:
             pat = comp['pattern']
-            for match in pat.finditer(text):
+            matches = list(pat.finditer(text))
+            for match in matches:
                 if match.start() == match.end():
                     continue
                 matched_text = match.group(0)
