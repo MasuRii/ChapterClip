@@ -5,10 +5,10 @@ from utils.validators import validate_json_file, validate_search_replace_term
 from utils.error_handler import SearchReplaceError
 def fix_variable_lookbehind(pattern):
     """
-    Fixes variable-width lookbehind patterns by refactoring them into fixed-width alternatives.
+    Fixes variable-width lookbehind patterns by refactoring them into fixed-width alternatives or using capturing groups for variable-width.
 
-    Specifically handles patterns like "(?<=\\d|\\b)(cr)\\b" and converts them to
-    "(?<=\\d)(cr)\\b|\\b(cr)\\b".
+    Handles patterns with alternatives like "(?<=\\d|\\b)(cr)\\b" and converts them to "(?<=\\d)(cr)\\b|\\b(cr)\\b".
+    For variable-width lookbehinds without alternatives (e.g., containing quantifiers), converts to capturing group syntax.
 
     Args:
         pattern (str): The regex pattern to fix.
@@ -22,28 +22,35 @@ def fix_variable_lookbehind(pattern):
         return pattern
 
     lb_content = lookbehind_match.group(1)
-    if '|' not in lb_content:
+    if '|' in lb_content:
+        # Handle alternatives as before
+        alts = [alt.strip() for alt in lb_content.split('|')]
+
+        # Get the part after the lookbehind
+        lb_end = lookbehind_match.end()
+        match_part = pattern[lb_end:]
+
+        # Build new patterns
+        new_patterns = []
+        for alt in alts:
+            if alt == '\\b':
+                # For \b (zero-width), place it before the match
+                new_pattern = f'\\b{match_part}'
+            else:
+                # For other alternatives, keep the lookbehind
+                new_pattern = f'(?<={alt}){match_part}'
+            new_patterns.append(new_pattern)
+
+        return '|'.join(new_patterns)
+    elif re.search(r'[\+\*]|{\d+,', lb_content):
+        # Variable-width (has quantifiers), use capturing groups
+        lb_end = lookbehind_match.end()
+        match_part = pattern[lb_end:]
+        return f'({lb_content})({match_part})'
+    else:
+        # Fixed-width, no change needed
         return pattern
 
-    # Split alternatives
-    alts = [alt.strip() for alt in lb_content.split('|')]
-
-    # Get the part after the lookbehind
-    lb_end = lookbehind_match.end()
-    match_part = pattern[lb_end:]
-
-    # Build new patterns
-    new_patterns = []
-    for alt in alts:
-        if alt == '\\b':
-            # For \b (zero-width), place it before the match
-            new_pattern = f'\\b{match_part}'
-        else:
-            # For other alternatives, keep the lookbehind
-            new_pattern = f'(?<={alt}){match_part}'
-        new_patterns.append(new_pattern)
-
-    return '|'.join(new_patterns)
 
 
 
@@ -102,6 +109,7 @@ def load_search_replace_terms(file_path, epub_path=None):
         raise SearchReplaceError(f"Error loading search-replace terms: {str(e)}")
 
 
+
 def apply_search_replace(text, terms):
     """
     Applies search-replace terms to the given text using batched replacement to handle overlaps and prioritization.
@@ -133,7 +141,7 @@ def apply_search_replace(text, terms):
                 # Fix variable-width lookbehind patterns
                 fixed_orig = fix_variable_lookbehind(orig)
                 flags = 0 if cs else re.IGNORECASE
-                regex_terms.append({'pattern': re.compile(fixed_orig, flags), 'replacement': repl})
+                regex_terms.append({'pattern': re.compile(fixed_orig, flags), 'replacement': repl, 'original_fixed': fixed_orig})
             else:
                 key = orig if cs else orig.lower()
                 if cs:
@@ -189,7 +197,15 @@ def apply_search_replace(text, terms):
                     if repl is not None:
                         replacements.append({'start': match.start(), 'end': match.end(), 'replacement': repl})
                 else:
-                    replacements.append({'start': match.start(), 'end': match.end(), 'replacement': comp['replacement']})
+                    # For variable-width lookbehind fixes, if it was converted to capturing groups, use group 2
+                    if 'original_fixed' in comp and comp['original_fixed'].startswith('(') and comp['original_fixed'].count('(') >= 2:
+                        if len(match.groups()) >= 2:
+                            matched_text = match.group(2)
+                            replacements.append({'start': match.start(2), 'end': match.end(2), 'replacement': comp['replacement']})
+                        else:
+                            replacements.append({'start': match.start(), 'end': match.end(), 'replacement': comp['replacement']})
+                    else:
+                        replacements.append({'start': match.start(), 'end': match.end(), 'replacement': comp['replacement']})
 
         # Sort: start asc, then end desc
         replacements.sort(key=lambda r: (r['start'], -r['end']))
